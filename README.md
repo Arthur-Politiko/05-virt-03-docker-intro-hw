@@ -43,6 +43,7 @@ docker search arthurpolitiko
 
 
 ## Задача 2
+
 1. Запустите ваш образ custom-nginx:1.0.0 командой docker run в соответвии с требованиями:
 - имя контейнера "ФИО-custom-nginx-t2"
 - контейнер работает в фоне
@@ -69,9 +70,10 @@ docker rename 8b54ac481706 paz-custom-nginx-t2
 Снова оцениваем результат ```docker ps```
 А вот так смотрим кто биндит наш порт ```sudo ss -tulpn```. Не забывай запускать из-под превилегированного пользователя иначе pid-ы не увидишь. Ну и по PID получаем чуть подробное описание CMD вот таким образом ``` ps -ef |grep 12415 ``` где 12415 это PID процесса который bounded к порту 8080
 
-
+![Скриншот к 3 и 4](./img/4.2.3.png)
 
 ## Задача 3
+
 1. Воспользуйтесь docker help или google, чтобы узнать как подключиться к стандартному потоку ввода/вывода/ошибок контейнера "custom-nginx-t2".
 2. Подключитесь к контейнеру и нажмите комбинацию Ctrl-C.
 3. Выполните ```docker ps -a``` и объясните своими словами почему контейнер остановился.
@@ -125,11 +127,10 @@ docker container attach paz-custom-nginx-t2
 ``` docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' custom-nginx-t2 ```
 Ну и далее прописываем наше DNAT правило в IPTABLES. 
 
-
-СКРИНШОТ!!!!
+![Скриншот к 10](./img/4.3.10.png)
+![Скриншот к 12](./img/4.3.12.png)
 
 ## Задача 4
-
 
 - Запустите первый контейнер из образа ***centos*** c любым тегом в фоновом режиме, подключив папку  текущий рабочий каталог ```$(pwd)``` на хостовой машине в ```/data``` контейнера, используя ключ -v.
 - Запустите второй контейнер из образа ***debian*** в фоновом режиме, подключив текущий рабочий каталог ```$(pwd)``` в ```/data``` контейнера. 
@@ -140,6 +141,10 @@ docker container attach paz-custom-nginx-t2
 
 В качестве ответа приложите скриншоты консоли, где видно все введенные команды и их вывод.
 
+
+Решение
+
+![Скриншот](./img/4.4.png)
 
 ## Задача 5
 
@@ -195,6 +200,68 @@ services:
 1. В первых строчках ответ:
 >The default path for a Compose file is compose.yaml (preferred) or compose.yml that is placed in the working directory. Compose also supports docker-compose.yaml and docker-compose.yml for backwards compatibility of earlier versions. If both files exist, Compose prefers the canonical compose.yaml.
 
-2.
+2. Из документации узнаём, что существует два пути. Или создать общий файл в котором перечислить какие yaml нужно обрабатывать, или с помощью нехитрой инструкции include подключаем another file.
+```
+include:
+  - docker-compose.yaml
+services:
+  portainer:
+    network_mode: host
+    image: portainer/portainer-ce:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+```
+![Скриншот](./img/4.5.2.png)
+
+
+3. В принципе дока оказалась полезной, но похожее мы делали ранее когда закидывали наш образ в репозиторий docker hub. 
+
+Логика примерно такая. Делаем pull образа, меняем его, запекаем, меняем тэг, пушим в наш репозиторий
+![Скриншот](./img/4.5.3.png)
+
+
+4. Не знаю почему, но portainer в моём случае что-то уж больно капризным оказался. Я его пытался использовать в ВМ из облака и как-то не сразу получилось настроить обратный прокси. На всякий случай вот изменения nginx:
+
+```
+server {
+	server_name 89.169.188.213; 
+
+	location / {
+        	proxy_pass http://localhost:9000/;
+	        proxy_http_version 1.1;
+        	proxy_set_header Host $host;
+	        proxy_set_header X-Real-IP $remote_addr;
+        	proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+	        proxy_set_header X-Forwarded-Proto $scheme;
+        	proxy_set_header Upgrade $http_upgrade;
+	        proxy_set_header Connection "upgrade";
+        
+	        proxy_redirect ~^http://localhost:9000/(.*)$ /$1;
+	}
+}
+
+```
+
+Работает так-же на 9000 порту.
+
+5. Можно из cli а можно и из web моррды. Странно что из бота Telegramm нельзя делать...
+
+6. 
+![Скриншот](./img/4.5.6.1.png)
+![Скриншот](./img/4.5.6.2.png)
+
+7. Мы получаем сообщение 
+> WARN[0000] Found orphan containers 
+То есть найден осиротевший (orphan) контейнер и compose не знает что с ним делать и нам предлагают снести его дописав команду --remove-orphans. 
+Интересно, а как docker вообще определяет что какой-то контейнер был поднят именно этим или каким-то иным docker compose и не снесёт ли он за-компанию он какой-то другой контейнер?
+Вот тут https://docs.docker.com/reference/cli/docker/inspect/ нам советуют испоьлзовать вот такую команду ``` docker inspect --format='{{json .Config}}' $INSTANCE_ID  ```
+в результате ищем строчку **com.docker.compose.project** она содержит название проекта. В общем, именно по этой плашке docker compose и понимает что контейнеры это части одного проекта.
+А вот так можно найти контейнеры одного проекта ```docker ps -a --filter "label=com.docker.compose.project=task5" ```
+
+Гасим проект:
+```docker compose stop```
+
+
+
 
 ---
