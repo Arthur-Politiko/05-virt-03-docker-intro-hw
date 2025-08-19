@@ -252,9 +252,11 @@ server {
 
 7. Мы получаем сообщение 
 > WARN[0000] Found orphan containers 
-То есть найден осиротевший (orphan) контейнер и compose не знает что с ним делать и нам предлагают снести его дописав команду --remove-orphans. 
+
+То есть найден осиротевший (orphan) контейнер и compose не знает что с ним делать и нам предлагают снести его дописав команду ```--remove-orphans```. 
+
 Интересно, а как docker вообще определяет что какой-то контейнер был поднят именно этим или каким-то иным docker compose и не снесёт ли он за-компанию он какой-то другой контейнер?
-Вот тут https://docs.docker.com/reference/cli/docker/inspect/ нам советуют испоьлзовать вот такую команду ``` docker inspect --format='{{json .Config}}' $INSTANCE_ID  ```
+Оказывается всё простьо. Вот тут https://docs.docker.com/reference/cli/docker/inspect/ нам советуют испоьлзовать вот такую команду ``` docker inspect --format='{{json .Config}}' $INSTANCE_ID  ```
 в результате ищем строчку **com.docker.compose.project** она содержит название проекта. В общем, именно по этой плашке docker compose и понимает что контейнеры это части одного проекта.
 А вот так можно найти контейнеры одного проекта ```docker ps -a --filter "label=com.docker.compose.project=task5" ```
 
